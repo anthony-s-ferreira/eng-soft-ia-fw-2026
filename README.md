@@ -21,11 +21,12 @@ Os arquivos mensais contêm quatro tabelas relacionadas:
 | `*_EmpenhosRelacionados.csv` | Empenhos financeiros vinculados |
 
 ## Estrutura do Projeto
+```text
 project/
- ├── data/
- ├── src/
- │   ├── data_loader.py
- │   ├── preprocess.py
- │   └── main.py
- ├── README.md
- └── requirements.txt
+├── data/
+├── src/
+│   ├── data_loader.py
+│   ├── preprocess.py
+│   └── main.py
+├── README.md
+└── requirements.txt
