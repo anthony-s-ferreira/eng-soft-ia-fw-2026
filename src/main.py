@@ -1,7 +1,9 @@
 from pathlib import Path
 
+from scipy.spatial import transform
+
 from data.loader import load_data
-from preprocessing.transform import clean_data, normalize_columns, split_data
+from preprocessing.transform import clean_data, normalize_columns, split_data, classify_dates
 
 
 def main() -> None:
@@ -12,9 +14,7 @@ def main() -> None:
     cleaned_data = clean_data(data)
     normalized_data = normalize_columns(cleaned_data)
     train_data, test_data = split_data(normalized_data)
-
-    print(train_data.head())
-    print(test_data.head())
+    classify_dates(normalized_data)
 
 
 if __name__ == "__main__":

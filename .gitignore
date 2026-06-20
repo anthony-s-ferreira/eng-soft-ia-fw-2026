@@ -1,2 +1,4 @@
 /.idea
 /src/__pycache__
+/src/preprocessing/__pycache__
+/src/data/__pycache__

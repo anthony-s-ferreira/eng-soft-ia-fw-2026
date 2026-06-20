@@ -2,6 +2,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 import unicodedata
 from typing import Tuple
+import numpy as np
 
 TEST_SIZE = 0.2
 RANDOM_SEED = 42
@@ -10,6 +11,7 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     """
     Limpa o DataFrame removendo linhas que contenham valores nulos (NaN)
     ou strings completamente vazias/compostas apenas por espaços.
+    Também transforma colunas de datas em formato datetime.
 
     Args:
         df (pd.DataFrame): O DataFrame original.
@@ -54,6 +56,8 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
         new_columns.append(final_col)
 
     normalized_df.columns = new_columns
+    normalized_df['data_abertura'] = pd.to_datetime(normalized_df['data_abertura'], format='%d/%m/%Y')
+    normalized_df['data_resultado_compra'] = pd.to_datetime(normalized_df['data_resultado_compra'], format='%d/%m/%Y')
 
     return normalized_df
 
@@ -70,3 +74,33 @@ def split_data(data: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
     train_data, test_data = train_test_split(data, test_size=TEST_SIZE, random_state=RANDOM_SEED)
 
     return train_data, test_data
+
+
+def classify_dates(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calcula os dias de diferença e classifica as compras.
+    Regras:
+    - <= 0 dias: alerta
+    - 1 a 3 dias: suspeito
+    - 4 a 365 dias: normal
+    - > 365 dias: muito demorado
+    """
+    df['dias_demorados'] = (df['data_resultado_compra'] - df['data_abertura']) / np.timedelta64(1, 'D')
+
+    df['classificacao'] = np.where(
+        df['dias_demorados'] <= 0,
+        'alerta',
+        np.where(
+            df['dias_demorados'] <= 3,
+            'suspeito',
+            np.where(
+                df['dias_demorados'] <= 365,
+                'normal',
+                'muito demorado'
+            )
+        )
+    )
+
+    print(df['classificacao'].value_counts())
+
+    return df
