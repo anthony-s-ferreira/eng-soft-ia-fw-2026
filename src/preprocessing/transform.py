@@ -11,7 +11,6 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     """
     Limpa o DataFrame removendo linhas que contenham valores nulos (NaN)
     ou strings completamente vazias/compostas apenas por espaços.
-    Também transforma colunas de datas em formato datetime.
 
     Args:
         df (pd.DataFrame): O DataFrame original.
@@ -32,6 +31,7 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     - Converte tudo para letras minúsculas.
     - Remove acentos e caracteres especiais.
     - Substitui espaços em branco por subtraços (_).
+    Também transforma colunas de datas em formato datetime.
 
     Args:
         df (pd.DataFrame): O DataFrame original.
