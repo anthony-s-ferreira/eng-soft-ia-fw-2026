@@ -2,6 +2,18 @@
 
 Projeto da disciplina de Engenharia de Software para IA e Frameworks Profundos.
 
+## Alunos
+| Arquivo | Conteúdo |
+|---|---|
+| `Paulo Brandão` | proba@cin.ufpe.br |
+| `Gustavo Bastos` | gcbastos@gmail.com  |
+| `Pedro Roncoli Sarmet Moreira` | prsm@cin.ufpe.br |
+| `George Queiroz` | gjq@cin.ufpe.br |
+| `César Calafrioli` | cesarmoes@gmail.com |
+| `Jhonata Lima` | jls3@cin.ufpe.br |
+| `Anthony` | anthony.silv.ferreira@gmail.com |
+
+
 ## Descrição do Problema
 
 Licitações públicas são processos legais que regulam a contratação de serviços e aquisição de bens pelo governo. Irregularidades nesses processos — como sobrepreço, direcionamento ou participação de empresas inidôneas — representam desvios de recursos públicos. Este projeto visa identificar automaticamente padrões suspeitos em dados de licitações federais.
