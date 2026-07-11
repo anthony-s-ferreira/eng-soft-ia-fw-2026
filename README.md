@@ -37,7 +37,7 @@ project/
 | Arquivo | Conteúdo |
 |---|---|
 | `Paulo Brandão` | proba@cin.ufpe.br |
-| `Gustavo Bastos` | gcbastos@gmail.com  |
+| `Gustavo Bastos` | gcb3@cin.ufpe.br  |
 | `Pedro Roncoli Sarmet Moreira` | prsm@cin.ufpe.br |
 | `George Queiroz` | gjq@cin.ufpe.br |
 | `César Calafrioli` | cesarmoes@gmail.com |
