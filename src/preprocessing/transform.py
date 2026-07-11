@@ -1,72 +1,97 @@
-import pandas as pd
-from sklearn.model_selection import train_test_split
-import unicodedata
 from typing import Tuple
+
+import numpy as np
+from numpy.lib import recfunctions as rfn
 
 TEST_SIZE = 0.2
 RANDOM_SEED = 42
 
-def clean_data(df: pd.DataFrame) -> pd.DataFrame:
+DATE_FIELDS = ('data_abertura', 'data_resultado_compra')
+
+
+def clean_data(data: np.ndarray) -> np.ndarray:
     """
-    Limpa o DataFrame removendo linhas que contenham valores nulos (NaN)
-    ou strings completamente vazias/compostas apenas por espaços.
-
-    Args:
-        df (pd.DataFrame): O DataFrame original.
-
-    Returns:
-        pd.DataFrame: Um novo DataFrame sem linhas vazias.
+    Remove linhas com algum campo vazio ou só de espaços, olhando todas
+    as colunas de texto do structured array.
     """
-    cleaned_df = df.replace(r'^\s*$', pd.NA, regex=True)
+    valid_mask = np.ones(data.shape[0], dtype=bool)
 
-    cleaned_df = cleaned_df.dropna()
+    for field_name in data.dtype.names:
+        field_values = np.char.strip(data[field_name])
+        valid_mask &= field_values != ''
 
-    return cleaned_df
+    return data[valid_mask]
 
 
-def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
+def _to_iso_date(value: str) -> str:
+    """'dd/mm/yyyy' -> 'yyyy-mm-dd' (formato que datetime64 aceita nativamente)."""
+    day, month, year = value.split('/')
+    return f'{year}-{month}-{day}'
+
+
+def parse_dates(data: np.ndarray) -> np.ndarray:
     """
-    Padroniza os nomes das colunas do DataFrame:
-    - Converte tudo para letras minúsculas.
-    - Remove acentos e caracteres especiais.
-    - Substitui espaços em branco por subtraços (_).
+    Converte os campos de data (texto 'dd/mm/yyyy') para datetime64[D].
 
-    Args:
-        df (pd.DataFrame): O DataFrame original.
-
-    Returns:
-        pd.DataFrame: DataFrame com os nomes das colunas padronizados.
+    A renomeação de colunas já acontece no loader.py (na origem), então
+    essa função substitui a antiga normalize_columns e só cuida das datas.
     """
-    normalized_df = df.copy()
-
-    new_columns = []
-
-    for col in normalized_df.columns:
-        col_str = str(col).lower()
-
-        unaccented_col = ''.join(
-            c for c in unicodedata.normalize('NFD', col_str)
-            if unicodedata.category(c) != 'Mn'
+    result = data
+    for field_name in DATE_FIELDS:
+        iso_dates = np.array(
+            [_to_iso_date(v) for v in data[field_name]],
+            dtype='datetime64[D]'
         )
+        result = rfn.drop_fields(result, field_name)
+        result = rfn.append_fields(result, field_name, iso_dates, usemask=False)
 
-        final_col = unaccented_col.strip().replace(' ', '_')
+    return result
 
-        new_columns.append(final_col)
 
-    normalized_df.columns = new_columns
-
-    return normalized_df
-
-def split_data(data: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def split_data(data: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Divide o DataFrame em conjuntos de treino (80%) e teste (20%).
-
-    Args:
-        data (pd.DataFrame): O DataFrame limpo a ser dividido.
-
-    Returns:
-        Tuple[pd.DataFrame, pd.DataFrame]: Uma tupla contendo (train_data, test_data).
+    Divide o structured array em treino (80%) e teste (20%), com seed fixa
+    (substitui o train_test_split do sklearn por uma versão pura NumPy).
     """
-    train_data, test_data = train_test_split(data, test_size=TEST_SIZE, random_state=RANDOM_SEED)
+    rng = np.random.default_rng(RANDOM_SEED)
+    n = data.shape[0]
+    shuffled_idx = rng.permutation(n)
 
-    return train_data, test_data
+    test_size = int(np.round(n * TEST_SIZE))
+    test_idx = shuffled_idx[:test_size]
+    train_idx = shuffled_idx[test_size:]
+
+    return data[train_idx], data[test_idx]
+
+
+def classify_dates(data: np.ndarray) -> np.ndarray:
+    """
+    Calcula os dias de diferença entre abertura e resultado, e classifica:
+    <=0 alerta | 1-3 suspeito | 4-365 normal | >365 muito demorado
+    """
+    days_diff = (
+        data['data_resultado_compra'] - data['data_abertura']
+    ) / np.timedelta64(1, 'D')
+
+    classification = np.where(
+        days_diff <= 0,
+        'alerta',
+        np.where(
+            days_diff <= 3,
+            'suspeito',
+            np.where(
+                days_diff <= 365,
+                'normal',
+                'muito demorado'
+            )
+        )
+    )
+
+    data = rfn.append_fields(data, 'dias_demorados', days_diff, usemask=False)
+    data = rfn.append_fields(data, 'classificacao', classification, usemask=False)
+
+    values, counts = np.unique(data['classificacao'], return_counts=True)
+    for value, count in zip(values, counts):
+        print(f'{value}: {count}')
+
+    return data

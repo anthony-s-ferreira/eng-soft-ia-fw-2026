@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from data.loader import load_data
-from preprocessing.transform import clean_data, normalize_columns, split_data
+from preprocessing.transform import clean_data, parse_dates, split_data, classify_dates
 
 
 def main() -> None:
@@ -10,12 +10,9 @@ def main() -> None:
 
     data = load_data(str(DATA_PATH))
     cleaned_data = clean_data(data)
-    normalized_data = normalize_columns(cleaned_data)
-    train_data, test_data = split_data(normalized_data)
-
-    print(train_data.head())
-    print(test_data.head())
-
+    parsed_data = parse_dates(cleaned_data)
+    train_data, test_data = split_data(parsed_data)
+    classify_dates(parsed_data)
 
 if __name__ == "__main__":
     main()
