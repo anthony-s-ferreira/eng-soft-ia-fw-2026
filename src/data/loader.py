@@ -1,54 +1,85 @@
 import zipfile
-import pandas as pd
+import csv
+import unicodedata
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
-def extract_tender_from_zip(zip_path: Path) -> Optional[pd.DataFrame]:
+import numpy as np
+
+
+def _normalize_field_name(name: str) -> str:
+    """Minúsculo, sem acento, espaço vira underscore. Ex: 'Data Abertura' -> 'data_abertura'."""
+    name = name.strip().lower()
+    unaccented = ''.join(
+        c for c in unicodedata.normalize('NFD', name)
+        if unicodedata.category(c) != 'Mn'
+    )
+    return unaccented.replace(' ', '_')
+
+
+def _read_csv_from_zip(zip_path: Path) -> Optional[Tuple[List[str], List[tuple]]]:
     """
-    Abre um arquivo ZIP, procura pelo CSV de Licitação e retorna seus dados.
+    Abre um ZIP, localiza o CSV de Licitação e devolve (header, linhas).
 
-    Args:
-        zip_path (Path): Caminho completo para o arquivo .zip.
-
-    Returns:
-        Optional[pd.DataFrame]: DataFrame com os dados, ou None se o arquivo não for encontrado.
+    Usa o módulo csv (quote-aware) em vez de split manual, porque o campo
+    'Objeto' contém texto livre com ';' dentro das aspas — um split ingênuo
+    por ';' quebraria essas linhas.
     """
     with zipfile.ZipFile(zip_path, 'r') as z:
         for file_name in z.namelist():
             if file_name.endswith('_Licitação.csv'):
-                with z.open(file_name) as f:
-                    return pd.read_csv(
-                        f,
-                        sep=';',
-                        encoding='latin1',
-                        dtype=str,
-                        on_bad_lines='skip'
-                    )
+                with z.open(file_name) as raw_file:
+                    text_lines = (line.decode('latin1') for line in raw_file)
+                    reader = csv.reader(text_lines, delimiter=';')
+                    try:
+                        header = next(reader)
+                    except StopIteration:
+                        return None
+                    rows = [tuple(row) for row in reader if len(row) == len(header)]
+                    return header, rows
     return None
 
 
-def load_data(path: str) -> pd.DataFrame:
+def load_data(path: str) -> np.ndarray:
     """
-    Carrega e concatena exclusivamente os dados de Licitação de uma pasta com arquivos ZIP.
-
-    Args:
-        path (str): Caminho para o diretório contendo os arquivos .zip.
-
-    Returns:
-        pd.DataFrame: DataFrame único com todas as licitações concatenadas.
+    Carrega e concatena exclusivamente os dados de Licitação de uma pasta
+    com arquivos ZIP, retornando um structured array do NumPy.
     """
     directory = Path(path)
     zip_files = list(directory.glob('*.zip'))
 
-    df_list: List[pd.DataFrame] = []
+    header: Optional[List[str]] = None
+    all_rows: List[tuple] = []
 
     for zip_path in zip_files:
-        df = extract_tender_from_zip(zip_path)
+        result = _read_csv_from_zip(zip_path)
+        if result is None:
+            continue
 
-        if df is not None and not df.empty:
-            df_list.append(df)
+        file_header, rows = result
 
-    if df_list:
-        return pd.concat(df_list, ignore_index=True)
+        if header is None:
+            header = file_header
+        elif file_header != header:
+            raise ValueError(
+                f"Cabeçalho de {zip_path.name} diferente do esperado: {file_header}"
+            )
 
-    return pd.DataFrame()
+        all_rows.extend(rows)
+
+    if header is None or not all_rows:
+        return np.array([])
+
+    field_names = [_normalize_field_name(col) for col in header]
+
+    # tamanho máximo real de cada campo, pra não truncar strings ao criar o dtype
+    max_lens = [
+        max(len(row[i]) for row in all_rows)
+        for i in range(len(field_names))
+    ]
+    dtype = np.dtype([
+        (name, f'U{max(length, 1)}')
+        for name, length in zip(field_names, max_lens)
+    ])
+
+    return np.array(all_rows, dtype=dtype)
