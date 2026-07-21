@@ -17,7 +17,7 @@ def _normalize_field_name(name: str) -> str:
     return unaccented.replace(' ', '_')
 
 
-def _read_csv_from_zip(zip_path: Path) -> Optional[Tuple[List[str], List[tuple]]]:
+def _read_csv_from_zip(zip_path: Path, file_end: str ) -> Optional[Tuple[List[str], List[tuple]]]:
     """
     Abre um ZIP, localiza o CSV de Licitação e devolve (header, linhas).
 
@@ -27,7 +27,7 @@ def _read_csv_from_zip(zip_path: Path) -> Optional[Tuple[List[str], List[tuple]]
     """
     with zipfile.ZipFile(zip_path, 'r') as z:
         for file_name in z.namelist():
-            if file_name.endswith('_Licitação.csv'):
+            if file_name.endswith(file_end):
                 with z.open(file_name) as raw_file:
                     text_lines = (line.decode('latin1') for line in raw_file)
                     reader = csv.reader(text_lines, delimiter=';')
@@ -40,7 +40,7 @@ def _read_csv_from_zip(zip_path: Path) -> Optional[Tuple[List[str], List[tuple]]
     return None
 
 
-def load_data(path: str) -> np.ndarray:
+def load_data(path: str, file_end: str) -> np.ndarray:
     """
     Carrega e concatena exclusivamente os dados de Licitação de uma pasta
     com arquivos ZIP, retornando um structured array do NumPy.
@@ -52,7 +52,7 @@ def load_data(path: str) -> np.ndarray:
     all_rows: List[tuple] = []
 
     for zip_path in zip_files:
-        result = _read_csv_from_zip(zip_path)
+        result = _read_csv_from_zip(zip_path, file_end)
         if result is None:
             continue
 

@@ -8,7 +8,7 @@ def main() -> None:
     BASE_DIR = Path(__file__).resolve().parent
     DATA_PATH = BASE_DIR.parent / "data"
 
-    data = load_data(str(DATA_PATH))
+    data = load_data(str(DATA_PATH), "_Licitação.csv")
     cleaned_data = clean_data(data)
     parsed_data = parse_dates(cleaned_data)
     train_data, test_data = split_data(parsed_data)
