@@ -40,6 +40,6 @@ project/
 | `Gustavo Bastos` | gcb3@cin.ufpe.br  |
 | `Pedro Roncoli Sarmet Moreira` | prsm@cin.ufpe.br |
 | `George Queiroz` | gjq@cin.ufpe.br |
-| `César Calafrioli` | cesarmoes@gmail.com |
+| `César Calafrioli` | caccm@cin.ufpe.br |
 | `Jhonata Lima` | jls3@cin.ufpe.br |
 | `Anthony` | anthony.silv.ferreira@gmail.com |
