@@ -1,94 +1,62 @@
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import TensorDataset, DataLoader, random_split
-from models.model import AnomalyAutoEncoder
+from src.data.loader import load_tables
+from src.evaluation.evaluate import relatorio
+from src.features.build_features import build_feature_matrix
+from src.preprocessing.transform import standardize, train_test_split_numpy
+from src.training.train import (
+    compute_anomaly_scores,
+    save_artifacts,
+    train_autoencoder,
+)
+from src.utils.config import CONFIG
 
-from config import DEVICE
+
+def main() -> None:
+    cfg = CONFIG
 
 
-def main():
-    device = DEVICE
+    print(f"Carregando dados das 4 tabelas dos ZIPS contidos em: {cfg.data_dir}", end=" ")
+    tables = load_tables(cfg.data_dir)
+    linhas = {
+        nome: (len(next(iter(cols.values()))) if cols else 0)
+        for nome, cols in tables.items()
+    }
+    print("\033[32mOK\033[0m")
+    print("Linhas por tabela:", linhas)
 
-    data = torch.load("data/bidding_tensors.pt", weights_only=True)
+    print("\nMontando a matriz de features (1 linha por licitação) ", end=" ")
+    X_raw, feature_names, meta = build_feature_matrix(
+        tables, cfg.categorical_features
+    )
+    print("\033[32mOK\033[0m")
+    print(f"\nMatriz de features: {X_raw.shape[0]} licitações x {X_raw.shape[1]} colunas")
 
-    print(f"Loaded data shape: {data.shape}")
-    if len(data) == 0:
-        raise ValueError("Dataset is empty. Run prepare_data.py again and verify data extraction.")
 
-    dataset = TensorDataset(data)
-    train_size = int(0.8 * len(dataset))
-    test_size = len(dataset) - train_size
-    train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
+    # 3. PADRONIZAR (NumPy) — guardamos mean/std para a inferência
+    print("\nPadronizando com Numpy e guardando mean/std para a inferência ", end=" ")
+    X_std, mean, std = standardize(X_raw)
+    print("\033[32mOK\033[0m")
 
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+    # 4. SPLIT treino/teste 
+    print("\nDividindo os dados em treino e teste ", end=" ")  
+    X_train, X_test = train_test_split_numpy(
+        X_std, test_size=cfg.test_size, seed=cfg.random_seed
+    )
+    print("\033[32mOK\033[0m")
 
-    input_dim = data.shape[1]
-    model = AnomalyAutoEncoder(input_dim).to(device)
-    criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    # 5. TREINAR (imprime erro de treino e teste a cada época)
+    model, _history = train_autoencoder(X_train, X_test, cfg)
+    print("\033[32mOK\033[0m")
 
-    epochs = 10
+    # 6. SALVAR modelo + scaler + nomes das colunas
+    print("\nSalvando o modelo mais o scaler e o nome das colunas" , end=" ")
+    save_artifacts(model, mean, std, feature_names, cfg)
+    print("\033[32mOK\033[0m")
 
-    for epoch in range(epochs):
-        model.train()
-        train_loss = 0.0
-
-        for batch in train_loader:
-            x = batch[0].to(device)
-
-            optimizer.zero_grad()
-            reconstructed = model(x)
-            loss = criterion(reconstructed, x)
-            loss.backward()
-            optimizer.step()
-
-            train_loss += loss.item()
-
-        model.eval()
-        val_loss = 0.0
-        with torch.no_grad():
-            all_test_data = test_dataset[:][0].to(device)
-
-            reconstructions = model(all_test_data)
-            errors = torch.mean((all_test_data - reconstructions) ** 2, dim=1)
-
-            errors_np = errors.cpu().numpy()
-
-            import numpy as np
-            threshold = np.percentile(errors_np, 95)
-            anomalies = errors_np > threshold
-
-            total_anomalies = np.sum(anomalies)
-
-            print("\n--- Inference Results (Whole Test Set) ---")
-            print(f"Dynamic Threshold (95th percentile): {threshold:.6f}")
-            print(f"Total anomalies found: {total_anomalies} out of {len(all_test_data)}")
-
-            top_5_indices = np.argsort(errors_np)[-5:]
-            print(f"Top 5 Anomaly Errors: {errors_np[top_5_indices]}")
-
-        avg_train = train_loss / len(train_loader)
-        avg_val = val_loss / len(test_loader)
-        print(f"Epoch {epoch + 1}/{epochs} | Train Loss: {avg_train:.4f} | Val Loss: {avg_val:.4f}")
-
-    torch.save(model.state_dict(), "anomaly_model.pth")
-
-    model.load_state_dict(torch.load("anomaly_model.pth", weights_only=True))
-    model.eval()
-
-    with torch.no_grad():
-        sample_data = test_dataset[:10][0].to(device)
-        reconstructions = model(sample_data)
-        errors = torch.mean((sample_data - reconstructions) ** 2, dim=1)
-
-        threshold = 1.5
-        anomalies = errors > threshold
-
-        print("\nInference Results:")
-        print(f"Errors: {errors.cpu().numpy()}")
-        print(f"Anomalies: {anomalies.cpu().numpy()}")
+    # 7. AVALIAR: score de todas as licitações + top-k anômalas
+    print("\nAvaliando o modelo treinado ", end=" ")
+    scores = compute_anomaly_scores(model, X_std)
+    relatorio(meta, scores, cfg.top_k)
+    print("\033[32mOK\033[0m")
 
 
 if __name__ == "__main__":
