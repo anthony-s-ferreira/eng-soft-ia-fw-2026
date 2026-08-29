@@ -2,8 +2,11 @@ import zipfile
 import csv
 import unicodedata
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 import numpy as np
+
+
+Tabela = np.ndarray
 
 
 def normalize_field_name(name: str) -> str:
@@ -33,7 +36,7 @@ def read_csv_from_zip(zip_path: Path, file_end: str) -> Optional[Tuple[List[str]
 
 def load_data(path: str, file_end: str) -> np.ndarray:
     directory = Path(path)
-    zip_files = list(directory.glob('*.zip'))
+    zip_files = sorted(directory.glob('*.zip'))
     header: Optional[List[str]] = None
     all_rows: List[tuple] = []
 
@@ -56,3 +59,17 @@ def load_data(path: str, file_end: str) -> np.ndarray:
     dtype = np.dtype([(name, f'U{max(length, 1)}') for name, length in zip(field_names, max_lens)])
 
     return np.array(all_rows, dtype=dtype)
+
+
+def load_tables(path: str | Path) -> Dict[str, Tabela]:
+    """Carrega as quatro tabelas mensais usadas pelo pipeline de features."""
+    suffixes = {
+        "empenhos": "_EmpenhosRelacionados.csv",
+        "item": "_ItemLicitação.csv",
+        "licitacao": "_Licitação.csv",
+        "participantes": "_ParticipantesLicitação.csv",
+    }
+    return {
+        table_name: load_data(str(path), file_end)
+        for table_name, file_end in suffixes.items()
+    }

@@ -1,6 +1,6 @@
 from src.data.loader import load_tables
 from src.evaluation.evaluate import relatorio
-from src.features.build_features import build_feature_matrix
+from src.features.feature import build_feature_matrix
 from src.preprocessing.transform import standardize, train_test_split_numpy
 from src.training.train import (
     compute_anomaly_scores,
@@ -16,10 +16,7 @@ def main() -> None:
 
     print(f"Carregando dados das 4 tabelas dos ZIPS contidos em: {cfg.data_dir}", end=" ")
     tables = load_tables(cfg.data_dir)
-    linhas = {
-        nome: (len(next(iter(cols.values()))) if cols else 0)
-        for nome, cols in tables.items()
-    }
+    linhas = {nome: len(table) for nome, table in tables.items()}
     print("\033[32mOK\033[0m")
     print("Linhas por tabela:", linhas)
 

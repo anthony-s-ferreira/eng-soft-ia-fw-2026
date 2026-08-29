@@ -6,7 +6,7 @@ import numpy as np
 # seja considerada suspeita
 MIN_FLAGS = 2
 
-def score_risco(meta: Dict[str, np.array]) -> np.ndarray:
+def score_risco(meta: Dict[str, np.ndarray]) -> np.ndarray:
     """Calcula o score de risco de contratações com base em critérios de competitividade e valor.
 
     O cálculo soma pontos (0 a 4) com base em quatro regras:
@@ -27,12 +27,13 @@ def score_risco(meta: Dict[str, np.array]) -> np.ndarray:
     modal = np.char.lower(meta["modalidade"].astype("U"))
 
     sem_disputa = np.logical_or(
-        np.char.find(modal, "dispensa") => 0,
-        np.char.find(modal, "inexig") => 0,
+        np.char.find(modal, "dispensa") >= 0,
+        np.char.find(modal, "inexig") >= 0,
     )
 
     pontos = np.zeros(len(valor), dtype=np.float64)
     pontos += (n_part <= 1).astype(np.float64)
+    pontos += sem_disputa.astype(np.float64)
     pontos += (valor >= np.quantile(valor, 0.95)).astype(np.float64)
     pontos += (valor >= np.quantile(valor, 0.99)).astype(np.float64)
 
@@ -96,18 +97,21 @@ def relatorio(meta: Dict[str, np.ndarray], scores: np.ndarray, top_k: int) -> No
 
     top_idx = np.argsort(scores)[::-1][:top_k]
 
-    print(f"\nTop {top_k} licitações mais anômalas"
+    print(f"\nTop {top_k} licitações mais anômalas "
           f"(coluna risco = pontos da régua, 0-4):")
-    print(f"{'licitacao':>12} | {'modalidade':<26} | {'uf':<3}" |
-          f"{'valor':>15} | {'part':>4} | {'risco':>5} | {'score':>9}")
+    print(
+        f"{'licitacao':>12} | {'modalidade':<26} | {'uf':<3}"
+        f"{'valor':>15} | {'part':>4} | {'risco':>5} | {'score':>9}"
+    )
 
     print("-" * 100)
 
     for i in top_idx:
         print(f"{meta['numero_licitacao'][i]:>12} | "
-              f"{str[meta['modalidade'][i]])[:26]:<26} | "
+              f"{str(meta['modalidade'][i])[:26]:<26} | "
               f"{meta['uf'][i]:<3} | "
+              f"{meta['valor'][i]:>15.2f} | "
               f"{int(meta['n_participantes'][i]):>4} | "
               f"{int(risco[i]):>5} | "
               f"{scores[i]:9.4f}"
-              ) 
+              )

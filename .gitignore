@@ -3,3 +3,4 @@
 *.pyc
 src/anomaly_model.pth
 src/data/bidding_tensors.pt
+/artifacts/
